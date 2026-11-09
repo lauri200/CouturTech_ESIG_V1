@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { @apply text-nuit font-sans antialiased; }
+  h1, h2, h3 { @apply font-titre; }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]; }
+  .btn-primaire { @apply btn bg-nuit text-white hover:bg-nuit-700; }
+  .btn-or { @apply btn bg-or text-white hover:bg-or-600; }
+  .btn-contour { @apply btn border border-nuit/20 bg-white text-nuit hover:border-nuit/40; }
+  .btn-danger { @apply btn border border-red-200 bg-white text-red-700 hover:bg-red-50; }
+  .btn-lien { @apply text-sm font-semibold text-or-600 hover:underline; }
+  .champ { @apply block w-full rounded-lg border border-nuit/15 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-or focus:ring-2 focus:ring-or/20 min-h-[44px]; }
+  .etiquette { @apply mb-1 block text-sm font-medium text-nuit; }
+  .carte { @apply rounded-xl border border-nuit/10 bg-white shadow-sm; }
+  .conteneur { @apply mx-auto w-full max-w-6xl px-4 sm:px-6; }
+  .titre-section { @apply font-titre text-2xl sm:text-3xl font-bold text-nuit; }
+  .tableau { @apply w-full text-left text-sm; }
+  .tableau th { @apply whitespace-nowrap border-b border-nuit/10 bg-nuit-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-nuit/70; }
+  .tableau td { @apply border-b border-nuit/5 px-3 py-2.5 align-top; }
+}
