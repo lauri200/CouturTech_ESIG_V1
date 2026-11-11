@@ -3,9 +3,25 @@
   "installCommand": "npm install && npm --prefix client install",
   "buildCommand": "npm --prefix client run build",
   "outputDirectory": "client/dist",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "node_modules/pdfkit/js/data/**"
+    }
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ],
-  "crons": [{ "path": "/api/cron/alertes", "schedule": "0 7 * * *" }]
+  "crons": [
+    {
+      "path": "/api/cron/alertes",
+      "schedule": "0 7 * * *"
+    }
+  ]
 }
