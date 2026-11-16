@@ -86,8 +86,7 @@ function Footer() {
           </ul>
         </div>
         <div className="text-sm">
-          <p className="mb-2 font-semibold text-white">Lomé, Togo</p>
-          <p>Projet de licence professionnelle – ESIG, 2025-2026.</p>
+          <p className="font-semibold text-white">Lomé, Togo</p>
         </div>
       </div>
       <p className="border-t border-white/10 py-4 text-center text-xs text-white/50">© {new Date().getFullYear()} CouturTech. Tous droits réservés.</p>

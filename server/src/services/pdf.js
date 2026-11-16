@@ -69,7 +69,6 @@ function genererPdf({ type, numero, date, commande, params, paiements }) {
     if (commande.date_remise_prevue) {
       doc.font('Helvetica').fillColor('#555').text(`Date de remise prévue : ${frDate(commande.date_remise_prevue)}`, 50, y + 20);
     }
-    doc.fontSize(8).fillColor('#888').text('Document généré par CouturTech. Montants en francs CFA (FCFA).', 50, 780, { width: 495, align: 'center' });
     doc.end();
   });
 }
