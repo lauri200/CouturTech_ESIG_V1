@@ -7,7 +7,7 @@ import { useToast } from '../../components/Toast';
 const CHAMPS = [
   ['NOM_MAISON', 'Nom de la maison'], ['ADRESSE_ATELIER', 'Adresse de l’atelier (essayage)'], ['HORAIRES_ATELIER', 'Horaires'],
   ['TELEPHONE_MAISON', 'Téléphone'], ['EMAIL_MAISON', 'E-mail'], ['D_ALERTE_HEURES', 'Alerte avant deadline (heures)'],
-  ['FRAIS_COLLECTE', 'Frais de collecte (FCFA)'], ['ACOMPTE_POURCENT', 'Acompte minimum avant confection (%)'], ['CRENEAUX_COLLECTE', 'Créneaux de collecte (séparés par des virgules)'], ['MAX_TENTATIVES_NOTIF', 'Tentatives d’envoi max.'],
+  ['FRAIS_COLLECTE', 'Frais de collecte (FCFA)'], ['ACOMPTE_POURCENT', 'Acompte minimum avant confection (%)'], ['CRENEAUX_COLLECTE', 'Créneaux de collecte'], ['MAX_TENTATIVES_NOTIF', 'Tentatives d’envoi max.'],
 ];
 
 export default function Parametres() {
