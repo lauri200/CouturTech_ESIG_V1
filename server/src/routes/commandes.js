@@ -7,6 +7,7 @@ const { todayISO, addDays, frDate, fcfa } = require('../utils/dates');
 const { peutTransiter, statutPaiement, LIBELLES } = require('../services/statuts');
 const { prochainNumero } = require('../services/numero');
 const { getParams } = require('../services/params');
+const { tailleConseillee } = require('../services/tailles');
 const { notifier, getGerants, getUser } = require('../services/notifications');
 const { genererPdf } = require('../services/pdf');
 const { mouvementStock, alerterStockBas, TAILLES } = require('./catalogue');
@@ -76,7 +77,7 @@ async function creerDocument(db, cmd, type) {
 const TEL = /^\+228\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{2}$/;
 const creationSchema = z.object({
   modele_id: z.coerce.number().int().positive(),
-  taille: z.enum(TAILLES, { message: 'Choisissez une taille.' }),
+  taille: z.enum(TAILLES, { message: 'Choisissez une taille.' }).optional(),
   source_tissu: z.enum(['MAISON', 'CLIENT'], { message: 'Choisissez un tissu.' }),
   tissu_id: z.coerce.number().int().positive().optional().nullable(),
   description_tissu_client: z.string().trim().max(500).optional().nullable(),
@@ -117,6 +118,13 @@ router.post('/', requireRole('CLIENT'), async (req, res) => {
   const id = await tx(async (db) => {
     const m = (await db.query('SELECT * FROM modele WHERE id = $1 AND actif', [d.modele_id])).rows[0];
     if (!m) throw badRequest('Modèle indisponible.');
+    if (d.mensuration_id) {
+      const mens = (await db.query('SELECT valeurs FROM mensuration WHERE id = $1 AND client_id = $2', [d.mensuration_id, req.user.id])).rows[0];
+      if (!mens) throw badRequest('Profil de mensurations introuvable.');
+      const dispo = (await db.query('SELECT taille FROM modele_metrage WHERE modele_id = $1', [m.id])).rows.map((r) => r.taille);
+      d.taille = tailleConseillee(mens.valeurs, params.GRILLE_TAILLES, dispo) || d.taille;
+    }
+    if (!d.taille) throw badRequest('Indiquez vos mensurations (poitrine, taille ou hanches).');
     const mm = (await db.query('SELECT metres FROM modele_metrage WHERE modele_id = $1 AND taille = $2', [m.id, d.taille])).rows[0];
     if (!mm) throw badRequest('Cette taille n’est pas proposée pour ce modèle.');
     const metrage = mm.metres;

@@ -72,3 +72,15 @@ export function joursRestants(iso) {
   const b = new Date(`${String(iso).slice(0, 10)}T00:00:00`);
   return Math.round((b - a) / 86400000);
 }
+
+// Même règle que le serveur (server/src/services/tailles.js).
+export function tailleConseillee(valeurs, grilleTexte, disponibles) {
+  const grille = String(grilleTexte || 'S:88/70/94,M:92/74/98,L:96/78/102,XL:102/84/108,2XL:108/90/114,3XL:114/96/120').split(',')
+    .map((x) => { const [t, b] = x.trim().split(':'); const [p, ta, h] = (b || '').split('/').map(Number); return { t: (t || '').trim(), p, ta, h }; })
+    .filter((l) => l.t && [l.p, l.ta, l.h].every(Number.isFinite) && (!disponibles || disponibles.includes(l.t)));
+  if (!grille.length || !valeurs) return null;
+  const v = { p: Number(valeurs.tour_poitrine), ta: Number(valeurs.tour_taille), h: Number(valeurs.tour_hanches) };
+  if (![v.p, v.ta, v.h].some((x) => Number.isFinite(x) && x > 0)) return null;
+  const ok = grille.find((l) => ['p', 'ta', 'h'].every((k) => !(Number.isFinite(v[k]) && v[k] > 0) || v[k] <= l[k]));
+  return (ok || grille[grille.length - 1]).t;
+}

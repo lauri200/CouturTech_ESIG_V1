@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, televerserImage } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
-import { aujourdhui, date, fcfa, TAILLES } from '../../lib/format';
+import { aujourdhui, date, fcfa, TAILLES, tailleConseillee } from '../../lib/format';
 import { useAuth } from '../../context/AuthContext';
 import { Champ, Erreur, Ligne, Spinner } from '../../components/ui';
 import { CarteTissu } from '../public/Tissus';
 
-const ETAPES = ['Modèle', 'Taille', 'Tissu', 'Récapitulatif'];
+const ETAPES = ['Modèle', 'Mensurations', 'Tissu', 'Récapitulatif'];
 const TEL = /^\+228\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{2}$/;
 
 export default function Commander() {
@@ -18,9 +18,8 @@ export default function Commander() {
   const tissus = useApi('/tissus');
   const params = useApi('/parametres/public');
   const cle = useRef(typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
-  const [etape, setEtape] = useState(sp.get('modele') ? (sp.get('taille') ? 2 : 1) : 0);
+  const [etape, setEtape] = useState(sp.get('modele') ? 1 : 0);
   const [modeleId, setModeleId] = useState(Number(sp.get('modele')) || null);
-  const [taille, setTaille] = useState(sp.get('taille') || '');
   const [source, setSource] = useState('');
   const [tissu, setTissu] = useState(null);
   const [desc, setDesc] = useState('');
@@ -30,15 +29,18 @@ export default function Commander() {
   const [livraison, setLivraison] = useState({ adresse: user.adresse || '', quartier: user.quartier || '', repere: '', telephone: user.telephone || '' });
   const mensurations = useApi('/mensurations');
   const [mensurationId, setMensurationId] = useState(null);
+  const [mesures, setMesures] = useState({ tour_poitrine: '', tour_taille: '', tour_hanches: '' });
+  const [envoiMesures, setEnvoiMesures] = useState(false);
   const [err, setErr] = useState({});
   const [erreur, setErreur] = useState(null);
   const [envoi, setEnvoi] = useState(false);
 
   const modele = useMemo(() => modeles.data?.items.find((m) => m.id === modeleId), [modeles.data, modeleId]);
+  const mensurationChoisie = (mensurations.data || []).find((m) => m.id === mensurationId) || mensurations.data?.[0] || null;
+  const taille = modele && mensurationChoisie ? tailleConseillee(mensurationChoisie.valeurs, params.data?.GRILLE_TAILLES, TAILLES.filter((t) => modele.metrages[t])) : '';
   const metrage = modele && taille ? modele.metrages[taille] : null;
   const creneaux = (params.data?.CRENEAUX_COLLECTE || '').split(',').filter(Boolean);
   const frais = Number(params.data?.FRAIS_COLLECTE) || 0;
-  const mensurationChoisie = mensurationId === 0 ? null : (mensurations.data || []).find((m) => m.id === mensurationId) || mensurations.data?.[0] || null;
   const fraisLivraison = Number(params.data?.FRAIS_LIVRAISON) || 0;
   const pctAcompte = Number(params.data?.ACOMPTE_POURCENT) || 0;
   const prixTissu = source === 'MAISON' && tissu && metrage ? Math.round(tissu.prix_metre * metrage) : 0;
@@ -52,7 +54,7 @@ export default function Commander() {
   const suivant = () => {
     const e = {};
     if (etape === 0 && !modele) e.modele = 'Choisissez un modèle.';
-    if (etape === 1 && !taille) e.taille = 'Choisissez une taille.';
+    if (etape === 1 && !taille) e.taille = 'Enregistrez au moins votre tour de poitrine, de taille ou de hanches.';
     if (etape === 2) {
       if (!source) e.source = 'Choisissez un tissu.';
       if (source === 'MAISON' && !tissu) e.source = 'Choisissez un tissu de la maison.';
@@ -125,7 +127,7 @@ export default function Commander() {
             {err.modele && <p className="mt-2 text-sm text-red-700">{err.modele}</p>}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {modeles.data.items.map((m) => (
-                <button key={m.id} type="button" onClick={() => { setModeleId(m.id); setTaille(''); }} aria-pressed={modeleId === m.id}
+                <button key={m.id} type="button" onClick={() => setModeleId(m.id)} aria-pressed={modeleId === m.id}
                   className={`carte overflow-hidden text-left transition ${modeleId === m.id ? 'ring-2 ring-or ring-offset-2' : 'hover:shadow-md'}`}>
                   <img src={m.photos[0]} alt="" className="aspect-[3/4] w-full object-cover" loading="lazy" />
                   <div className="p-3"><p className="font-semibold leading-tight">{m.nom}</p><p className="text-sm text-nuit/60">{fcfa(m.prix_confection)}</p></div>
@@ -139,27 +141,36 @@ export default function Commander() {
           <section className="grid gap-6 sm:grid-cols-[180px_1fr]">
             <img src={modele.photos[0]} alt={modele.nom} className="aspect-[3/4] w-full max-w-[180px] rounded-xl object-cover" />
             <div>
-              <h2 className="text-xl font-semibold">Votre taille pour « {modele.nom} »</h2>
-              <p className="mt-1 text-sm text-nuit/60">Pas d’essayage à l’atelier : la tenue vous est livrée à domicile. Si une retouche est nécessaire, demandez-la en ligne et notre livreur vient la récupérer.</p>
-              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
-                {TAILLES.filter((t) => modele.metrages[t]).map((t) => (
-                  <button key={t} type="button" onClick={() => setTaille(t)} aria-pressed={taille === t}
-                    className={`min-h-[52px] rounded-lg border text-base font-semibold ${taille === t ? 'border-nuit bg-nuit text-white' : 'border-nuit/20 bg-white hover:border-nuit'}`}>
-                    {t}<span className="block text-[11px] font-normal opacity-70">{modele.metrages[t]} m</span>
-                  </button>
-                ))}
+              <h2 className="text-xl font-semibold">Vos mensurations pour « {modele.nom} »</h2>
+              <p className="mt-1 text-sm text-nuit/60">Le tailleur coupe d’après vos mesures en centimètres. La tenue vous est livrée à domicile ; si une retouche est nécessaire, demandez-la en ligne et notre livreur vient la récupérer.</p>
+              {mensurations.data?.length > 0 && (
+                <div className="mt-3">
+                <Champ label="Profil de mensurations">
+                  <select className="champ" value={mensurationChoisie?.id ?? ''} onChange={(e) => setMensurationId(Number(e.target.value))}>
+                    {mensurations.data.map((m) => <option key={m.id} value={m.id}>{m.source === 'SCAN' ? 'Scan' : 'Saisie'} du {date(m.created_at)} · {[m.valeurs.tour_poitrine, m.valeurs.tour_taille, m.valeurs.tour_hanches].map((v) => v ?? '–').join(' / ')} cm</option>)}
+                  </select>
+                </Champ>
+                </div>
+              )}
+              {taille && <p className="mt-3 rounded-lg bg-or/10 p-3 font-semibold">Votre taille correspond à {taille} <span className="font-normal text-nuit/70">· {metrage} m de tissu</span></p>}
+              <div className="mt-4 rounded-lg border border-nuit/10 p-3">
+                <p className="font-semibold">{mensurations.data?.length ? 'Ou saisir de nouvelles mesures' : 'Saisissez vos mesures'}</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {[['tour_poitrine', 'Tour de poitrine'], ['tour_taille', 'Tour de taille'], ['tour_hanches', 'Tour de hanches']].map(([k, l]) => (
+                    <Champ key={k} label={`${l} (cm)`}><input type="number" min="30" max="250" step="0.5" className="champ" value={mesures[k]} onChange={(e) => setMesures({ ...mesures, [k]: e.target.value })} /></Champ>
+                  ))}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <button type="button" className="btn-contour" disabled={envoiMesures} onClick={async () => {
+                    const valeurs = Object.fromEntries(Object.entries(mesures).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)]));
+                    if (!Object.keys(valeurs).length) { setErr({ taille: 'Saisissez au moins une mesure.' }); return; }
+                    setEnvoiMesures(true);
+                    try { const m = await api('/mensurations', { method: 'POST', body: { valeurs } }); await mensurations.recharger(); setMensurationId(m.id); setErr({}); } catch (e) { setErr({ taille: e.message }); } finally { setEnvoiMesures(false); }
+                  }}>{envoiMesures ? 'Enregistrement…' : 'Enregistrer ces mesures'}</button>
+                  <Link to="/client/mensurations" className="btn-lien">Toutes les mesures et le scan par photos →</Link>
+                </div>
               </div>
               {err.taille && <p className="mt-2 text-sm text-red-700">{err.taille}</p>}
-            </div>
-            <div className="mt-6 rounded-lg border border-nuit/10 p-3 sm:col-span-2">
-              <p className="font-semibold">Mes mensurations (recommandé)</p>
-              <p className="text-sm text-nuit/60">La taille sert de repère ; le tailleur coupe d’après vos mesures en centimètres.</p>
-              {mensurations.data?.length ? (
-                <select aria-label="Mensurations" className="champ mt-2" value={mensurationChoisie?.id ?? 0} onChange={(e) => setMensurationId(Number(e.target.value))}>
-                  {mensurations.data.map((m) => <option key={m.id} value={m.id}>{m.source === 'SCAN' ? 'Scan' : 'Saisie'} du {date(m.created_at)}</option>)}
-                  <option value={0}>Ne pas joindre de mensurations</option>
-                </select>
-              ) : <Link to="/client/mensurations" className="btn-lien mt-2 inline-block">Ajouter mes mensurations →</Link>}
             </div>
           </section>
         )}

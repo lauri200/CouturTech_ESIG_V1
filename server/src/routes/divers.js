@@ -10,6 +10,7 @@ const { getParams, setParams, publicParams } = require('../services/params');
 const { executerAlertes } = require('../services/alertes');
 const { EN_COURS } = require('../services/statuts');
 
+const { lireGrille } = require('../services/tailles');
 const router = express.Router();
 
 // ---- Paramètres ----
@@ -22,6 +23,10 @@ router.put('/parametres', authenticate, requireRole('GERANT'), async (req, res) 
   if (d.DELAI_RETOUCHE_JOURS !== undefined && !(Number(d.DELAI_RETOUCHE_JOURS) >= 1)) throw badRequest('Délai de retouche invalide.');
   if (d.FRAIS_COLLECTE !== undefined && !(Number(d.FRAIS_COLLECTE) >= 0)) throw badRequest('Frais de collecte invalides.');
   if (d.ACOMPTE_POURCENT !== undefined && !(Number(d.ACOMPTE_POURCENT) >= 0 && Number(d.ACOMPTE_POURCENT) <= 100)) throw badRequest('Pourcentage d’acompte invalide (0 à 100).');
+  if (d.GRILLE_TAILLES !== undefined) {
+    const n = String(d.GRILLE_TAILLES).split(',').filter((x) => x.trim()).length;
+    if (!n || lireGrille(d.GRILLE_TAILLES).length !== n) throw badRequest('Tableau des tailles invalide. Format : S:88/70/94,M:92/74/98,…');
+  }
   res.json(await setParams(d));
 });
 

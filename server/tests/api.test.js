@@ -199,6 +199,13 @@ describe('Mensurations et scan par photos', () => {
     expect(c.status).toBe(201);
     expect((await request(app).get(`/api/commandes/${c.body.id}`).set(as('client'))).body.mensuration.valeurs.tour_taille).toBe(74.5);
   });
+  test('taille calculée d’après les mensurations (sans choix S à 3XL)', async () => {
+    const m = await request(app).post('/api/mensurations').set(as('client')).send({ valeurs: { tour_poitrine: 92, tour_taille: 74.5, tour_hanches: 98 } });
+    const c = await request(app).post('/api/commandes').set(as('client')).send({ modele_id: 3, source_tissu: 'MAISON', tissu_id: 1, livraison: LIV, mensuration_id: m.body.id });
+    expect(c.status).toBe(201);
+    expect(c.body.taille).toBe('L');
+    expect((await request(app).post('/api/commandes').set(as('client')).send({ modele_id: 3, source_tissu: 'MAISON', tissu_id: 1, livraison: LIV })).status).toBe(422);
+  });
   test('scan : 503 si Bodygram non configuré', async () => {
     expect((await request(app).get('/api/mensurations/config').set(as('client'))).body.scan_disponible).toBe(false);
     expect((await request(app).post('/api/mensurations/scan').set(as('client')).send(SCAN)).status).toBe(503);
