@@ -17,12 +17,6 @@ function Cadre({ titre, sousTitre, children }) {
   );
 }
 
-const COMPTES_DEMO = [
-  ['Client', 'client@couturtech.tg'],
-  ['Gérant', 'gerant@couturtech.tg'],
-  ['Tailleur', 'tailleur@couturtech.tg'],
-  ['Livreur', 'livreur@couturtech.tg'],
-];
 
 export function Connexion() {
   const { connexion } = useAuth();
@@ -54,15 +48,6 @@ export function Connexion() {
         <button type="submit" className="btn-primaire w-full" disabled={envoi}>{envoi ? 'Connexion…' : 'SE CONNECTER'}</button>
       </form>
       <p className="mt-6 text-center text-sm">Pas encore de compte ? <Link to="/inscription" state={state} className="btn-lien">Créer un compte</Link></p>
-      <details className="mt-6 rounded-lg bg-nuit-50 p-3 text-xs">
-        <summary className="cursor-pointer font-semibold">Comptes de démonstration</summary>
-        <p className="mt-2 text-nuit/70">Mot de passe : <code>Demo2026!</code></p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {COMPTES_DEMO.map(([r, email]) => (
-            <button key={email} type="button" className="btn-contour min-h-0 py-1.5 text-xs" onClick={() => setF({ email, mot_de_passe: 'Demo2026!' })}>{r}</button>
-          ))}
-        </div>
-      </details>
     </Cadre>
   );
 }
