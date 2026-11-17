@@ -8,7 +8,7 @@ const { prochainNumero } = require('../src/services/numero');
 const MDP_DEMO = 'Demo2026!';
 
 const UTILISATEURS = [
-  ['Gérant', 'Démo', 'gerant@couturtech.tg', '+228 90 00 00 01', 'GERANT'],
+  ['COUTURE', 'CHIDE’S', 'gerant@couturtech.tg', '+228 90 00 00 01', 'GERANT'],
   ['Tailleur', 'Kossi', 'tailleur@couturtech.tg', '+228 90 00 00 02', 'TAILLEUR'],
   ['Tailleur', 'Akouvi', 'tailleur2@couturtech.tg', '+228 90 00 00 03', 'TAILLEUR'],
   ['Livreur', 'Yao', 'livreur@couturtech.tg', '+228 90 00 00 04', 'LIVREUR'],
@@ -74,7 +74,7 @@ async function seed() {
       ['client2@couturtech.tg', 2, 'L', 1, ['CONFIRMEE', 'ATTRIBUEE'], 'tailleur2@couturtech.tg', -1, 0],
       ['client@couturtech.tg', 6, 'S', 5, ['CONFIRMEE', 'ATTRIBUEE', 'EN_CONFECTION', 'PRETE'], 'tailleur@couturtech.tg', 0, 15000],
       ['client2@couturtech.tg', 5, 'M', null, ['CONFIRMEE', 'EN_ATTENTE_COLLECTE'], null, null, 0, 'PLANIFIEE'],
-      ['client@couturtech.tg', 4, 'M', 4, ['CONFIRMEE', 'ATTRIBUEE', 'EN_CONFECTION', 'PRETE', 'EN_ESSAYAGE', 'RETIREE'], 'tailleur2@couturtech.tg', -3, 'SOLDE'],
+      ['client@couturtech.tg', 4, 'M', 4, ['CONFIRMEE', 'ATTRIBUEE', 'EN_CONFECTION', 'PRETE', 'EN_LIVRAISON', 'LIVREE'], 'tailleur2@couturtech.tg', -3, 'SOLDE'],
     ];
     for (const [clientEmail, mi, taille, ti, statuts, tailleurEmail, dl, paye, collecte] of demos) {
       const m = modeles[mi];
@@ -89,12 +89,13 @@ async function seed() {
       const debut = addDays(today, dl !== null && dl < 0 ? dl - 4 : -1);
       const { rows } = await db.query(
         `INSERT INTO commande (numero, client_id, modele_id, taille, source_tissu, tissu_id, description_tissu_client, metrage, prix_confection, prix_tissu, total, statut,
-          statut_paiement, montant_paye, date_debut, date_remise_prevue, tailleur_id, deadline, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$15::date + time '09:00')
+          statut_paiement, montant_paye, date_debut, date_remise_prevue, tailleur_id, deadline, created_at, adresse_livraison, quartier_livraison, repere_livraison, telephone_livraison)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$15::date + time '09:00','Rue de la démo',$19,'Portail bleu, face à la pharmacie',$20)
          RETURNING id`,
         [numero, ids[clientEmail], m.id, taille, t ? 'MAISON' : 'CLIENT', t ? t.id : null, t ? null : 'Bazin blanc, 6 mètres, apporté par le client', metrage,
           m.prix_confection, prixTissu, total, statut, montant === 0 ? 'NON_PAYE' : montant < total ? 'ACOMPTE' : 'SOLDE', montant, debut,
-          addDays(debut, m.delai_jours + 2), tailleurEmail ? ids[tailleurEmail] : null, deadline]);
+          addDays(debut, m.delai_jours + 2), tailleurEmail ? ids[tailleurEmail] : null, deadline,
+          clientEmail === 'client@couturtech.tg' ? 'Bè' : 'Tokoin', clientEmail === 'client@couturtech.tg' ? '+228 90 00 00 05' : '+228 90 00 00 06']);
       const cid = rows[0].id;
       let prev = null;
       for (const s of statuts) {
@@ -113,7 +114,13 @@ async function seed() {
       if (montant > 0) await db.query("INSERT INTO paiement (commande_id, montant, mode, date_paiement, enregistre_par) VALUES ($1,$2,'MOBILE_MONEY',$3,$4)", [cid, montant, debut, gerant]);
       const dev = await prochainNumero(db, 'DEV');
       await db.query("INSERT INTO facture (commande_id, type, numero, montant_total, created_at) VALUES ($1,'DEVIS',$2,$3,$4)", [cid, dev, total, debut]);
-      if (statut === 'RETIREE') {
+      if (statut === 'PRETE') {
+        await db.query("INSERT INTO collecte (commande_id, type, adresse, quartier, repere, telephone) VALUES ($1,'LIVRAISON','Rue de la démo',$2,'Portail bleu, face à la pharmacie',$3)",
+          [cid, clientEmail === 'client@couturtech.tg' ? 'Bè' : 'Tokoin', clientEmail === 'client@couturtech.tg' ? '+228 90 00 00 05' : '+228 90 00 00 06']);
+      }
+      if (statut === 'LIVREE') {
+        await db.query("INSERT INTO collecte (commande_id, type, adresse, quartier, repere, telephone, livreur_id, date_prevue, creneau, statut, collectee_at) VALUES ($1,'LIVRAISON','Rue de la démo','Bè','Portail bleu, face à la pharmacie','+228 90 00 00 05',$2,$3,'10h-12h','COLLECTEE',now())",
+          [cid, ids['livreur@couturtech.tg'], addDays(today, -1)]);
         const fac = await prochainNumero(db, 'FAC');
         await db.query("INSERT INTO facture (commande_id, type, numero, montant_total) VALUES ($1,'FACTURE',$2,$3)", [cid, fac, total]);
       }

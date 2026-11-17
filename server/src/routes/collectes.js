@@ -5,7 +5,10 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { parse, notFound, forbidden, conflict, badRequest } = require('../utils/errors');
 const { frDate, todayISO } = require('../utils/dates');
 const { notifier, getGerants, getUser } = require('../services/notifications');
-const { chargerCommande, changerStatut } = require('./commandes');
+const { chargerCommande, changerStatut, creerDocument } = require('./commandes');
+const { fcfa } = require('../utils/dates');
+const { appUrl } = require('../config');
+const { getParams } = require('../services/params');
 
 const router = express.Router();
 router.use(authenticate, requireRole('GERANT', 'LIVREUR'));
@@ -23,10 +26,14 @@ const TRANSITIONS = {
   COLLECTEE: ['REMISE_ATELIER'],
   REMISE_ATELIER: [],
 };
+const TRANSITIONS_LIVRAISON = { ...TRANSITIONS, COLLECTEE: [] };
+const transitions = (c) => (c.type === 'LIVRAISON' ? TRANSITIONS_LIVRAISON : TRANSITIONS)[c.statut];
+const MISSION = { TISSU: 'Collecte du tissu', LIVRAISON: 'Livraison de la tenue', RETOUCHE: 'Récupération pour retouche' };
+const termine = (co) => co.statut === 'REMISE_ATELIER' || (co.type === 'LIVRAISON' && co.statut === 'COLLECTEE');
 
 // RG13 : après remise à l'atelier, le livreur ne voit plus les coordonnées du client.
 function vue(co, user) {
-  if (user.role === 'LIVREUR' && co.statut === 'REMISE_ATELIER') {
+  if (user.role === 'LIVREUR' && termine(co)) {
     return { ...co, adresse: '—', repere: null, telephone: '—', client_nom: co.client_nom.split(' ')[0] };
   }
   return co;
@@ -65,15 +72,21 @@ router.patch('/:id/planifier', requireRole('GERANT'), async (req, res) => {
   const co = await tx(async (db) => {
     const c = (await db.query('SELECT * FROM collecte WHERE id = $1 FOR UPDATE', [Number(req.params.id)])).rows[0];
     if (!c) throw notFound('Collecte introuvable.');
-    if (!TRANSITIONS[c.statut].includes('PLANIFIEE')) throw conflict('Cette collecte ne peut plus être planifiée.');
+    if (!transitions(c).includes('PLANIFIEE')) throw conflict('Cette mission ne peut plus être planifiée.');
+    if (c.type === 'LIVRAISON') {
+      const cmd = await chargerCommande(c.commande_id, db, true);
+      if (cmd.statut_paiement !== 'SOLDE') throw conflict(`Solde non réglé : reste ${fcfa(cmd.total - cmd.montant_paye)} à encaisser avant la livraison.`);
+      if (cmd.statut === 'PRETE') await changerStatut(db, cmd, 'EN_LIVRAISON', req.user.id, 'Livraison planifiée');
+    }
     const l = (await db.query("SELECT id FROM utilisateur WHERE id = $1 AND role = 'LIVREUR' AND actif", [d.livreur_id])).rows[0];
     if (!l) throw badRequest('Livreur introuvable ou inactif.');
     await db.query("UPDATE collecte SET livreur_id = $2, date_prevue = $3, creneau = $4, statut = 'PLANIFIEE', motif_echec = NULL WHERE id = $1", [c.id, d.livreur_id, d.date_prevue, d.creneau]);
     return charger(c.id, db);
   });
-  await notifier('N02', [{ user: await getUser(co.client_id), canaux: ['EMAIL', 'SMS', 'INAPP'] }], { numero: co.numero, date: frDate(co.date_prevue), creneau: co.creneau }, co.commande_id);
+  const codeClient = { TISSU: 'N02', LIVRAISON: 'N14', RETOUCHE: 'N16' }[co.type];
+  await notifier(codeClient, [{ user: await getUser(co.client_id), canaux: ['EMAIL', 'SMS', 'INAPP'] }], { numero: co.numero, date: frDate(co.date_prevue), creneau: co.creneau }, co.commande_id);
   await notifier('N10', [{ user: await getUser(co.livreur_id), canaux: ['SMS', 'INAPP'] }],
-    { numero: co.numero, adresse: `${co.adresse}, ${co.quartier}`, repere: co.repere || 'sans repère', date: frDate(co.date_prevue), creneau: co.creneau, telephone: co.telephone }, co.commande_id);
+    { mission: MISSION[co.type], numero: co.numero, adresse: `${co.adresse}, ${co.quartier}`, repere: co.repere || 'sans repère', date: frDate(co.date_prevue), creneau: co.creneau, telephone: co.telephone }, co.commande_id);
   res.json(co);
 });
 
@@ -87,13 +100,17 @@ router.patch('/:id/statut', async (req, res) => {
     const c = (await db.query('SELECT * FROM collecte WHERE id = $1 FOR UPDATE', [Number(req.params.id)])).rows[0];
     if (!c) throw notFound('Collecte introuvable.');
     if (req.user.role === 'LIVREUR' && c.livreur_id !== req.user.id) throw forbidden('Cette collecte ne vous est pas affectée.');
-    if (!TRANSITIONS[c.statut].includes(d.statut)) throw conflict('Action impossible à ce stade de la collecte.');
+    if (!transitions(c).includes(d.statut)) throw conflict('Action impossible à ce stade de la mission.');
     const set = { COLLECTEE: 'collectee_at = now()', REMISE_ATELIER: 'remise_at = now()', ECHOUEE: 'motif_echec = $3' }[d.statut];
     await db.query(`UPDATE collecte SET statut = $2, ${set} WHERE id = $1`, d.statut === 'ECHOUEE' ? [c.id, d.statut, d.motif] : [c.id, d.statut]);
-    if (d.statut === 'REMISE_ATELIER') {
-      const cmd = await chargerCommande(c.commande_id, db, true);
-      await changerStatut(db, cmd, 'TISSU_RECU', req.user.id, 'Tissu remis à l’atelier');
+    const cmd = await chargerCommande(c.commande_id, db, true);
+    if (c.type === 'TISSU' && d.statut === 'REMISE_ATELIER') await changerStatut(db, cmd, 'TISSU_RECU', req.user.id, 'Tissu remis à l’atelier');
+    if (c.type === 'RETOUCHE' && d.statut === 'REMISE_ATELIER') await changerStatut(db, cmd, 'EN_CONFECTION', req.user.id, 'Tenue remise à l’atelier pour retouche');
+    if (c.type === 'LIVRAISON' && d.statut === 'COLLECTEE') {
+      await changerStatut(db, cmd, 'LIVREE', req.user.id, 'Tenue remise au client');
+      await creerDocument(db, cmd, 'FACTURE');
     }
+    if (c.type === 'LIVRAISON' && d.statut === 'ECHOUEE' && cmd.statut === 'EN_LIVRAISON') await changerStatut(db, cmd, 'PRETE', req.user.id, `Livraison non effectuée : ${d.motif}`);
     return charger(c.id, db);
   });
   const client = await getUser(co.client_id);
@@ -101,7 +118,11 @@ router.patch('/:id/statut', async (req, res) => {
   if (d.statut === 'ECHOUEE') {
     await notifier('N11', [{ user: client, canaux: ['SMS', 'INAPP'] }, ...gerants.map((g) => ({ user: g, canaux: ['INAPP'] }))], { numero: co.numero, motif: d.motif }, co.commande_id);
   }
-  if (d.statut === 'REMISE_ATELIER') {
+  if (co.type === 'LIVRAISON' && d.statut === 'COLLECTEE') {
+    const params = await getParams();
+    await notifier('N09', [{ user: client, canaux: ['EMAIL', 'INAPP'] }], { numero: co.numero, lien: `${appUrl}/client/commandes/${co.commande_id}`, delai: params.DELAI_RETOUCHE_JOURS }, co.commande_id);
+  }
+  if (co.type === 'TISSU' && d.statut === 'REMISE_ATELIER') {
     const cmd = await chargerCommande(co.commande_id);
     await notifier('N03', [{ user: client, canaux: ['EMAIL', 'INAPP'] }, ...gerants.map((g) => ({ user: g, canaux: ['INAPP'] }))], { numero: co.numero, date: frDate(cmd.date_remise_prevue) }, co.commande_id);
   }

@@ -19,7 +19,7 @@ export default function Paiements() {
         <Stat label="Total commandé" valeur={fcfa(somme(actives, 'total'))} />
         <Stat label="Encaissé" valeur={fcfa(somme(actives, 'montant_paye'))} />
         <Stat label="Reste à encaisser" valeur={fcfa(somme(actives, 'reste_a_payer'))} />
-        <Stat label="Prêtes non soldées" valeur={actives.filter((c) => ['PRETE', 'EN_ESSAYAGE'].includes(c.statut) && c.statut_paiement !== 'SOLDE').length} />
+        <Stat label="Prêtes non soldées" valeur={actives.filter((c) => ['PRETE', 'EN_LIVRAISON'].includes(c.statut) && c.statut_paiement !== 'SOLDE').length} />
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
         {[['NON_PAYE,ACOMPTE', 'À encaisser'], ['NON_PAYE', 'Non payé'], ['ACOMPTE', 'Acompte'], ['SOLDE', 'Soldé']].map(([v, l]) => (

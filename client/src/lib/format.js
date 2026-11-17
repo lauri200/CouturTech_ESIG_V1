@@ -17,20 +17,29 @@ export const STATUTS = {
   ATTRIBUEE: { libelle: 'Attribuée', classe: 'bg-indigo-100 text-indigo-800' },
   EN_CONFECTION: { libelle: 'En confection', classe: 'bg-violet-100 text-violet-800' },
   PRETE: { libelle: 'Prête', classe: 'bg-emerald-100 text-emerald-800' },
-  EN_ESSAYAGE: { libelle: 'En essayage', classe: 'bg-lime-100 text-lime-800' },
-  RETIREE: { libelle: 'Retirée', classe: 'bg-nuit-100 text-nuit' },
+  EN_LIVRAISON: { libelle: 'En livraison', classe: 'bg-lime-100 text-lime-800' },
+  LIVREE: { libelle: 'Livrée', classe: 'bg-nuit-100 text-nuit' },
+  RETOUCHE_DEMANDEE: { libelle: 'Retouche demandée', classe: 'bg-orange-100 text-orange-800' },
   ANNULEE: { libelle: 'Annulée', classe: 'bg-red-100 text-red-700' },
 };
 
-export const PARCOURS_CLIENT = ['CONFIRMEE', 'EN_ATTENTE_COLLECTE', 'TISSU_RECU', 'ATTRIBUEE', 'EN_CONFECTION', 'PRETE', 'EN_ESSAYAGE', 'RETIREE'];
+export const PARCOURS_CLIENT = ['CONFIRMEE', 'EN_ATTENTE_COLLECTE', 'TISSU_RECU', 'ATTRIBUEE', 'EN_CONFECTION', 'PRETE', 'EN_LIVRAISON', 'LIVREE'];
 
 export const STATUTS_COLLECTE = {
   A_PLANIFIER: { libelle: 'À planifier', classe: 'bg-amber-100 text-amber-800' },
   PLANIFIEE: { libelle: 'Planifiée', classe: 'bg-sky-100 text-sky-800' },
-  COLLECTEE: { libelle: 'Tissu récupéré', classe: 'bg-violet-100 text-violet-800' },
+  COLLECTEE: { libelle: 'Récupéré', classe: 'bg-violet-100 text-violet-800' },
   REMISE_ATELIER: { libelle: 'Remis à l’atelier', classe: 'bg-emerald-100 text-emerald-800' },
   ECHOUEE: { libelle: 'Échouée', classe: 'bg-red-100 text-red-700' },
 };
+
+export const TYPES_MISSION = {
+  TISSU: { libelle: 'Collecte du tissu', fin: 'Tissu récupéré' },
+  LIVRAISON: { libelle: 'Livraison de la tenue', fin: 'Livrée au client' },
+  RETOUCHE: { libelle: 'Récupération pour retouche', fin: 'Tenue récupérée' },
+};
+export const missionTerminee = (m) => m.statut === 'REMISE_ATELIER' || (m.type === 'LIVRAISON' && m.statut === 'COLLECTEE');
+export const libelleMission = (m) => (m.type === 'LIVRAISON' && m.statut === 'COLLECTEE' ? 'Livrée' : STATUTS_COLLECTE[m.statut]?.libelle);
 
 export const PAIEMENTS = {
   NON_PAYE: { libelle: 'Non payé', classe: 'bg-red-50 text-red-700' },

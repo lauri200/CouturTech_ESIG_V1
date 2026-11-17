@@ -18,6 +18,8 @@ router.get('/parametres', authenticate, requireRole('GERANT'), async (_req, res)
 router.put('/parametres', authenticate, requireRole('GERANT'), async (req, res) => {
   const d = parse(z.record(z.string(), z.union([z.string(), z.number()])), req.body);
   if (d.D_ALERTE_HEURES !== undefined && !(Number(d.D_ALERTE_HEURES) >= 0)) throw badRequest('Délai d’alerte invalide.');
+  if (d.FRAIS_LIVRAISON !== undefined && !(Number(d.FRAIS_LIVRAISON) >= 0)) throw badRequest('Frais de livraison invalides.');
+  if (d.DELAI_RETOUCHE_JOURS !== undefined && !(Number(d.DELAI_RETOUCHE_JOURS) >= 1)) throw badRequest('Délai de retouche invalide.');
   if (d.FRAIS_COLLECTE !== undefined && !(Number(d.FRAIS_COLLECTE) >= 0)) throw badRequest('Frais de collecte invalides.');
   if (d.ACOMPTE_POURCENT !== undefined && !(Number(d.ACOMPTE_POURCENT) >= 0 && Number(d.ACOMPTE_POURCENT) <= 100)) throw badRequest('Pourcentage d’acompte invalide (0 à 100).');
   res.json(await setParams(d));
@@ -47,7 +49,7 @@ router.get('/utilisateurs', authenticate, requireRole('GERANT'), async (req, res
   const { rows } = await query(
     `SELECT u.id, u.nom, u.prenom, u.email, u.telephone, u.role, u.actif, u.created_at,
       (SELECT count(*)::int FROM commande c WHERE c.tailleur_id = u.id AND c.statut IN ('ATTRIBUEE','EN_CONFECTION')) AS taches_en_cours,
-      (SELECT count(*)::int FROM collecte co WHERE co.livreur_id = u.id AND co.statut IN ('PLANIFIEE','COLLECTEE')) AS collectes_en_cours
+      (SELECT count(*)::int FROM collecte co WHERE co.livreur_id = u.id AND (co.statut = 'PLANIFIEE' OR (co.statut = 'COLLECTEE' AND co.type <> 'LIVRAISON'))) AS collectes_en_cours
      FROM utilisateur u WHERE u.role = ANY($1) ORDER BY u.role, u.prenom`, [roles]);
   res.json(rows);
 });
@@ -78,7 +80,7 @@ router.patch('/utilisateurs/:id', authenticate, requireRole('GERANT'), async (re
   const id = Number(req.params.id);
   if (id === req.user.id && !d.actif) throw conflict('Vous ne pouvez pas désactiver votre propre compte.');
   if (!d.actif) {
-    const occupe = await query("SELECT 1 FROM commande WHERE tailleur_id = $1 AND statut IN ('ATTRIBUEE','EN_CONFECTION') UNION SELECT 1 FROM collecte WHERE livreur_id = $1 AND statut IN ('PLANIFIEE','COLLECTEE') LIMIT 1", [id]);
+    const occupe = await query("SELECT 1 FROM commande WHERE tailleur_id = $1 AND statut IN ('ATTRIBUEE','EN_CONFECTION') UNION SELECT 1 FROM collecte WHERE livreur_id = $1 AND (statut = 'PLANIFIEE' OR (statut = 'COLLECTEE' AND type <> 'LIVRAISON')) LIMIT 1", [id]);
     if (occupe.rowCount) throw conflict('Ce membre a des tâches en cours : réattribuez-les avant de le désactiver.');
   }
   const { rows } = await query("UPDATE utilisateur SET actif = $2 WHERE id = $1 AND role <> 'CLIENT' RETURNING id, nom, prenom, email, telephone, role, actif", [id, d.actif]);
@@ -113,13 +115,14 @@ router.get('/notifications/journal', authenticate, requireRole('GERANT'), async 
 router.get('/dashboard', authenticate, requireRole('GERANT'), async (_req, res) => {
   const k = (await query(`SELECT
       count(*) FILTER (WHERE statut = ANY($1))::int AS en_cours,
-      count(*) FILTER (WHERE statut = 'PRETE' OR statut = 'EN_ESSAYAGE')::int AS pretes,
+      count(*) FILTER (WHERE statut IN ('PRETE', 'EN_LIVRAISON'))::int AS pretes,
+      count(*) FILTER (WHERE statut = 'RETOUCHE_DEMANDEE')::int AS retouches,
       count(*) FILTER (WHERE deadline < CURRENT_DATE AND statut IN ('ATTRIBUEE','EN_CONFECTION'))::int AS en_retard,
       count(*) FILTER (WHERE statut IN ('ATTRIBUEE','EN_CONFECTION') AND deadline BETWEEN CURRENT_DATE AND CURRENT_DATE + 2)::int AS deadline_proche,
       count(*) FILTER (WHERE statut = 'EN_ATTENTE_COLLECTE')::int AS collectes_attente,
       count(*) FILTER (WHERE statut IN ('CONFIRMEE','TISSU_RECU'))::int AS a_attribuer,
       COALESCE(sum(total - montant_paye) FILTER (WHERE statut <> 'ANNULEE'), 0)::int AS reste_a_encaisser,
-      count(*) FILTER (WHERE statut = 'RETIREE' AND date_trunc('month', updated_at) = date_trunc('month', now()))::int AS retirees_mois
+      count(*) FILTER (WHERE statut = 'LIVREE' AND date_trunc('month', updated_at) = date_trunc('month', now()))::int AS retirees_mois
     FROM commande`, [EN_COURS])).rows[0];
   k.encaisse_mois = (await query("SELECT COALESCE(sum(montant),0)::int AS v FROM paiement WHERE date_trunc('month', date_paiement) = date_trunc('month', now())")).rows[0].v;
   k.stock_bas = (await query('SELECT id, nom, stock_metres, seuil_alerte FROM tissu WHERE actif AND stock_metres <= seuil_alerte ORDER BY stock_metres')).rows;

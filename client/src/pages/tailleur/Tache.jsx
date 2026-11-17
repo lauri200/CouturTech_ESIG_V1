@@ -6,6 +6,7 @@ import { date, joursRestants } from '../../lib/format';
 import { Badge, Erreur, Ligne, Retard, Spinner } from '../../components/ui';
 import Historique from '../../components/Historique';
 import { useToast } from '../../components/Toast';
+import { SectionMensurations } from '../../components/Mensurations';
 
 export default function Tache() {
   const { id } = useParams();
@@ -60,6 +61,7 @@ export default function Tache() {
             <button type="button" className="btn-contour mt-2" onClick={sauverNote}>ENREGISTRER LA NOTE</button>
             {c.notes_retouches && <p className="mt-3 text-sm"><span className="text-nuit/60">Retouches :</span> {c.notes_retouches}</p>}
           </section>
+          <SectionMensurations mensuration={c.mensuration} />
           <section className="carte p-4"><h2 className="mb-3 font-semibold">Historique</h2><Historique items={c.historique} afficherAuteur={false} /></section>
         </div>
       </div>

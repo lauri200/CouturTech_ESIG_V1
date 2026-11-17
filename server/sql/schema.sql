@@ -109,8 +109,7 @@ CREATE TABLE IF NOT EXISTS commande (
   idempotency_key VARCHAR(80),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (statut IN ('CONFIRMEE','EN_ATTENTE_COLLECTE','TISSU_RECU','ATTRIBUEE','EN_CONFECTION','PRETE','EN_ESSAYAGE','RETIREE','ANNULEE')),
-  CHECK ((source_tissu = 'MAISON' AND tissu_id IS NOT NULL) OR (source_tissu = 'CLIENT' AND tissu_id IS NULL)),
+    CHECK ((source_tissu = 'MAISON' AND tissu_id IS NOT NULL) OR (source_tissu = 'CLIENT' AND tissu_id IS NULL)),
   UNIQUE (client_id, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS idx_commande_statut ON commande(statut);
@@ -129,7 +128,7 @@ CREATE TABLE IF NOT EXISTS historique_statut (
 
 CREATE TABLE IF NOT EXISTS collecte (
   id SERIAL PRIMARY KEY,
-  commande_id INT NOT NULL UNIQUE REFERENCES commande(id) ON DELETE CASCADE,
+  commande_id INT NOT NULL REFERENCES commande(id) ON DELETE CASCADE,
   livreur_id INT REFERENCES utilisateur(id),
   adresse VARCHAR(200) NOT NULL,
   quartier VARCHAR(80) NOT NULL,
@@ -198,3 +197,39 @@ CREATE TABLE IF NOT EXISTS parametre (
   cle VARCHAR(40) PRIMARY KEY,
   valeur TEXT NOT NULL
 );
+
+-- V1.1 : livraison à domicile, retouches à distance, mensurations
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS frais_livraison INT NOT NULL DEFAULT 0;
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS adresse_livraison VARCHAR(200);
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS quartier_livraison VARCHAR(80);
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS repere_livraison VARCHAR(200);
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS telephone_livraison VARCHAR(20);
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS motif_retouche TEXT;
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS photo_retouche_url VARCHAR(300);
+DO $$ DECLARE r RECORD; BEGIN
+  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid = 'commande'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%EN_ESSAYAGE%' AND conname <> 'commande_statut_valide' LOOP
+    EXECUTE format('ALTER TABLE commande DROP CONSTRAINT %I', r.conname);
+  END LOOP;
+END $$;
+UPDATE commande SET statut = 'PRETE' WHERE statut = 'EN_ESSAYAGE';
+UPDATE commande SET statut = 'LIVREE' WHERE statut = 'RETIREE';
+ALTER TABLE commande DROP CONSTRAINT IF EXISTS commande_statut_valide;
+ALTER TABLE commande ADD CONSTRAINT commande_statut_valide CHECK (statut IN ('CONFIRMEE','EN_ATTENTE_COLLECTE','TISSU_RECU','ATTRIBUEE','EN_CONFECTION','PRETE','EN_LIVRAISON','LIVREE','RETOUCHE_DEMANDEE','ANNULEE'));
+ALTER TABLE collecte DROP CONSTRAINT IF EXISTS collecte_commande_id_key;
+ALTER TABLE collecte ADD COLUMN IF NOT EXISTS type VARCHAR(10) NOT NULL DEFAULT 'TISSU' CHECK (type IN ('TISSU','LIVRAISON','RETOUCHE'));
+CREATE INDEX IF NOT EXISTS idx_collecte_commande ON collecte(commande_id, type);
+INSERT INTO collecte (commande_id, type, adresse, quartier, telephone)
+  SELECT c.id, 'LIVRAISON', COALESCE(c.adresse_livraison, u.adresse, 'À préciser avec le client'), COALESCE(c.quartier_livraison, u.quartier, 'À préciser'), COALESCE(c.telephone_livraison, u.telephone, '')
+  FROM commande c JOIN utilisateur u ON u.id = c.client_id
+  WHERE c.statut IN ('PRETE','EN_LIVRAISON') AND NOT EXISTS (SELECT 1 FROM collecte x WHERE x.commande_id = c.id AND x.type = 'LIVRAISON');
+
+CREATE TABLE IF NOT EXISTS mensuration (
+  id SERIAL PRIMARY KEY,
+  client_id INT NOT NULL REFERENCES utilisateur(id) ON DELETE CASCADE,
+  source VARCHAR(8) NOT NULL CHECK (source IN ('MANUEL','SCAN')),
+  fournisseur VARCHAR(30),
+  valeurs JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_mensuration_client ON mensuration(client_id, created_at DESC);
+ALTER TABLE commande ADD COLUMN IF NOT EXISTS mensuration_id INT REFERENCES mensuration(id) ON DELETE SET NULL;

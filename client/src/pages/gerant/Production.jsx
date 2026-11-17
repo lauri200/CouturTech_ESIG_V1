@@ -5,8 +5,8 @@ import { date, joursRestants, STATUTS } from '../../lib/format';
 import { EnTete, Erreur, Retard, Spinner } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 
-const COLONNES = ['EN_ATTENTE_COLLECTE', 'CONFIRMEE', 'TISSU_RECU', 'ATTRIBUEE', 'EN_CONFECTION', 'PRETE', 'EN_ESSAYAGE'];
-const SUIVANT = { ATTRIBUEE: 'EN_CONFECTION', EN_CONFECTION: 'PRETE', PRETE: 'EN_ESSAYAGE' };
+const COLONNES = ['EN_ATTENTE_COLLECTE', 'CONFIRMEE', 'TISSU_RECU', 'ATTRIBUEE', 'EN_CONFECTION', 'PRETE', 'EN_LIVRAISON', 'RETOUCHE_DEMANDEE'];
+const SUIVANT = { ATTRIBUEE: 'EN_CONFECTION', EN_CONFECTION: 'PRETE' };
 
 export default function Production() {
   const { data, erreur, recharger } = useApi(`/commandes?statut=${COLONNES.join(',')}`);

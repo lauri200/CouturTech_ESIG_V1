@@ -20,7 +20,7 @@ const BASE = `
     t.nom AS tissu_nom, t.type AS tissu_type, t.photo_url AS tissu_photo, t.prix_metre AS tissu_prix_metre,
     cl.nom AS client_nom, cl.prenom AS client_prenom, cl.telephone AS client_telephone, cl.email AS client_email,
     ta.prenom || ' ' || ta.nom AS tailleur_nom,
-    co.id AS collecte_id, co.statut AS collecte_statut,
+    co.id AS collecte_id, co.statut AS collecte_statut, co.type AS collecte_type,
     (c.deadline IS NOT NULL AND c.deadline < CURRENT_DATE AND c.statut IN ('ATTRIBUEE','EN_CONFECTION')) AS en_retard,
     (c.total - c.montant_paye) AS reste_a_payer
   FROM commande c
@@ -28,12 +28,12 @@ const BASE = `
   JOIN utilisateur cl ON cl.id = c.client_id
   LEFT JOIN tissu t ON t.id = c.tissu_id
   LEFT JOIN utilisateur ta ON ta.id = c.tailleur_id
-  LEFT JOIN collecte co ON co.commande_id = c.id`;
+  LEFT JOIN LATERAL (SELECT id, statut, type FROM collecte WHERE commande_id = c.id ORDER BY id DESC LIMIT 1) co ON TRUE`;
 
 // RG13 : le tailleur ne voit ni prix, ni téléphone, ni adresse, ni e-mail du client.
 const CHAMPS_TAILLEUR = ['id', 'numero', 'modele_id', 'modele_nom', 'modele_reference', 'modele_categorie', 'modele_photo', 'taille', 'source_tissu',
   'tissu_nom', 'tissu_type', 'tissu_photo', 'description_tissu_client', 'photo_tissu_client_url', 'metrage', 'statut', 'deadline',
-  'note_tailleur', 'notes_retouches', 'en_retard', 'created_at', 'updated_at'];
+  'note_tailleur', 'notes_retouches', 'motif_retouche', 'photo_retouche_url', 'en_retard', 'created_at', 'updated_at'];
 function vuePourRole(cmd, user) {
   if (user.role !== 'TAILLEUR') return cmd;
   const out = Object.fromEntries(CHAMPS_TAILLEUR.map((k) => [k, cmd[k]]));
@@ -73,6 +73,7 @@ async function creerDocument(db, cmd, type) {
 }
 
 // ---- Création (RG1 à RG5) ----
+const TEL = /^\+228\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{2}$/;
 const creationSchema = z.object({
   modele_id: z.coerce.number().int().positive(),
   taille: z.enum(TAILLES, { message: 'Choisissez une taille.' }),
@@ -88,6 +89,13 @@ const creationSchema = z.object({
     date_souhaitee: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date obligatoire'),
     creneau_souhaite: z.string().trim().min(1, 'Créneau obligatoire').max(20),
   }).optional(),
+  mensuration_id: z.coerce.number().int().positive().optional().nullable(),
+  livraison: z.object({
+    adresse: z.string().trim().min(1, 'Adresse de livraison obligatoire').max(200),
+    quartier: z.string().trim().min(1, 'Quartier obligatoire').max(80),
+    repere: z.string().trim().max(200).optional().default(''),
+    telephone: z.string().trim().regex(TEL, 'Format attendu : +228 XX XX XX XX'),
+  }).optional(),
 });
 
 router.post('/', requireRole('CLIENT'), async (req, res) => {
@@ -97,6 +105,7 @@ router.post('/', requireRole('CLIENT'), async (req, res) => {
     const ex = await query('SELECT id FROM commande WHERE client_id = $1 AND idempotency_key = $2', [req.user.id, cle]);
     if (ex.rows[0]) return res.status(200).json(await chargerCommande(ex.rows[0].id));
   }
+  if (!d.livraison) throw badRequest('Indiquez l’adresse de livraison.');
   if (d.source_tissu === 'MAISON' && !d.tissu_id) throw badRequest('Choisissez un tissu de la maison.');
   if (d.source_tissu === 'CLIENT') {
     if (!d.description_tissu_client) throw badRequest('Décrivez votre tissu (type, couleur, longueur).');
@@ -120,17 +129,23 @@ router.post('/', requireRole('CLIENT'), async (req, res) => {
       prixTissu = Math.round(tissu.prix_metre * metrage);
     }
     const frais = d.source_tissu === 'CLIENT' ? Number(params.FRAIS_COLLECTE) || 0 : 0;
-    const total = m.prix_confection + prixTissu + frais;
+    const fraisLivraison = Number(params.FRAIS_LIVRAISON) || 0;
+    const total = m.prix_confection + prixTissu + frais + fraisLivraison;
+    const l = d.livraison;
+    if (d.mensuration_id && !(await db.query('SELECT 1 FROM mensuration WHERE id = $1 AND client_id = $2', [d.mensuration_id, req.user.id])).rows[0]) {
+      throw badRequest('Profil de mensurations introuvable.');
+    }
     const numero = await prochainNumero(db, 'CMD');
     const debut = todayISO();
     const statut = d.source_tissu === 'CLIENT' ? 'EN_ATTENTE_COLLECTE' : 'CONFIRMEE';
     const { rows } = await db.query(
       `INSERT INTO commande (numero, client_id, modele_id, taille, source_tissu, tissu_id, description_tissu_client, photo_tissu_client_url,
-        metrage, prix_confection, prix_tissu, frais_collecte, total, statut, date_debut, date_remise_prevue, idempotency_key)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
+        metrage, prix_confection, prix_tissu, frais_collecte, total, statut, date_debut, date_remise_prevue, idempotency_key,
+        frais_livraison, adresse_livraison, quartier_livraison, repere_livraison, telephone_livraison, mensuration_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
       [numero, req.user.id, m.id, d.taille, d.source_tissu, tissu ? tissu.id : null, d.source_tissu === 'CLIENT' ? d.description_tissu_client : null,
         d.source_tissu === 'CLIENT' ? d.photo_tissu_client_url || null : null, metrage, m.prix_confection, prixTissu, frais, total, statut,
-        debut, addDays(debut, m.delai_jours), cle],
+        debut, addDays(debut, m.delai_jours), cle, fraisLivraison, l.adresse, l.quartier, l.repere, l.telephone, d.mensuration_id || null],
     );
     const cid = rows[0].id;
     await db.query("INSERT INTO historique_statut (commande_id, ancien_statut, nouveau_statut, utilisateur_id) VALUES ($1, NULL, 'CONFIRMEE', $2)", [cid, req.user.id]);
@@ -190,14 +205,50 @@ router.get('/:id', async (req, res) => {
     `SELECT h.*, u.prenom || ' ' || u.nom AS auteur, u.role AS auteur_role FROM historique_statut h LEFT JOIN utilisateur u ON u.id = h.utilisateur_id
      WHERE h.commande_id = $1 ORDER BY h.created_at, h.id`, [cmd.id]);
   const out = vuePourRole(cmd, req.user);
+  out.mensuration = cmd.mensuration_id ? (await query('SELECT id, source, fournisseur, valeurs, created_at FROM mensuration WHERE id = $1', [cmd.mensuration_id])).rows[0] || null : null;
   out.historique = hist.rows.map((h) => (req.user.role === 'TAILLEUR' ? { ...h, auteur: undefined } : h));
   if (req.user.role !== 'TAILLEUR') {
-    out.collecte = (await query(
-      `SELECT co.*, l.prenom || ' ' || l.nom AS livreur_nom FROM collecte co LEFT JOIN utilisateur l ON l.id = co.livreur_id WHERE co.commande_id = $1`, [cmd.id])).rows[0] || null;
+    const missions = (await query(
+      `SELECT co.*, l.prenom || ' ' || l.nom AS livreur_nom FROM collecte co LEFT JOIN utilisateur l ON l.id = co.livreur_id WHERE co.commande_id = $1 ORDER BY co.id`, [cmd.id])).rows;
+    out.collecte = missions.find((m) => m.type === 'TISSU') || null;
+    out.missions = missions.filter((m) => m.type !== 'TISSU');
     out.paiements = (await query('SELECT * FROM paiement WHERE commande_id = $1 ORDER BY date_paiement, id', [cmd.id])).rows;
     out.documents = (await query('SELECT id, type, numero, montant_total, created_at FROM facture WHERE commande_id = $1 ORDER BY id', [cmd.id])).rows;
   }
   res.json(out);
+});
+
+// ---- Livraison et retouches à domicile ----
+async function creerMissionDomicile(db, cmd, type) {
+  const enCours = await db.query("SELECT 1 FROM collecte WHERE commande_id = $1 AND type = $2 AND statut IN ('A_PLANIFIER','PLANIFIEE','ECHOUEE')", [cmd.id, type]);
+  if (enCours.rows[0]) return;
+  const cl = (await db.query('SELECT adresse, quartier, telephone FROM utilisateur WHERE id = $1', [cmd.client_id])).rows[0] || {};
+  await db.query('INSERT INTO collecte (commande_id, type, adresse, quartier, repere, telephone) VALUES ($1,$2,$3,$4,$5,$6)', [
+    cmd.id, type, cmd.adresse_livraison || cl.adresse || 'À préciser avec le client', cmd.quartier_livraison || cl.quartier || 'À préciser',
+    cmd.repere_livraison || null, cmd.telephone_livraison || cl.telephone || cmd.client_telephone]);
+}
+
+router.post('/:id/retouche', requireRole('CLIENT'), async (req, res) => {
+  const d = parse(z.object({
+    motif: z.string().trim().min(5, 'Décrivez la retouche souhaitée.').max(1000),
+    photo_url: z.string().trim().max(300).optional().nullable(),
+  }), req.body);
+  const params = await getParams();
+  const cmd = await tx(async (db) => {
+    const c = await chargerCommande(Number(req.params.id), db, true);
+    verifierAcces(c, req.user);
+    if (c.statut !== 'LIVREE') throw conflict('Une retouche ne peut être demandée qu’après la livraison.');
+    const livree = (await db.query("SELECT max(collectee_at) AS le FROM collecte WHERE commande_id = $1 AND type = 'LIVRAISON' AND statut = 'COLLECTEE'", [c.id])).rows[0].le;
+    const delai = Number(params.DELAI_RETOUCHE_JOURS) || 7;
+    if (livree && Date.now() - new Date(livree).getTime() > delai * 86400000) throw conflict(`Le délai de ${delai} jours pour demander une retouche est dépassé.`);
+    await changerStatut(db, c, 'RETOUCHE_DEMANDEE', req.user.id, d.motif);
+    await db.query('UPDATE commande SET motif_retouche = $2, photo_retouche_url = $3, notes_retouches = $2 WHERE id = $1', [c.id, d.motif, d.photo_url || null]);
+    await creerMissionDomicile(db, c, 'RETOUCHE');
+    return chargerCommande(c.id, db);
+  });
+  const gerants = await getGerants();
+  await notifier('N15', gerants.map((g) => ({ user: g, canaux: ['EMAIL', 'INAPP'] })), { numero: cmd.numero, motif: d.motif }, cmd.id);
+  res.json(cmd);
 });
 
 // ---- Attribution (RG6, RG7) ----
@@ -236,7 +287,7 @@ router.patch('/:id/deadline', requireRole('GERANT'), async (req, res) => {
   let ancienneRemise;
   const cmd = await tx(async (db) => {
     const c = await chargerCommande(Number(req.params.id), db, true);
-    if (['RETIREE', 'ANNULEE'].includes(c.statut)) throw conflict('Commande clôturée.');
+    if (['LIVREE', 'ANNULEE'].includes(c.statut)) throw conflict('Commande clôturée.');
     ancienneRemise = c.date_remise_prevue;
     const remise = d.date_remise_prevue || c.date_remise_prevue;
     const deadline = d.deadline || c.deadline;
@@ -255,7 +306,7 @@ router.patch('/:id/deadline', requireRole('GERANT'), async (req, res) => {
 // ---- Avancement (RG10 à RG12) ----
 router.patch('/:id/statut', requireRole('GERANT', 'TAILLEUR'), async (req, res) => {
   const d = parse(z.object({
-    statut: z.enum(['EN_CONFECTION', 'PRETE', 'EN_ESSAYAGE', 'RETIREE']),
+    statut: z.enum(['EN_CONFECTION', 'PRETE']),
     notes_retouches: z.string().trim().max(1000).optional(),
   }), req.body);
   const params = await getParams();
@@ -265,12 +316,9 @@ router.patch('/:id/statut', requireRole('GERANT', 'TAILLEUR'), async (req, res) 
       if (c.tailleur_id !== req.user.id) throw forbidden('Cette tâche ne vous est pas attribuée.');
       if (!['EN_CONFECTION', 'PRETE'].includes(d.statut)) throw forbidden('Action réservée au gérant.');
     }
-    if (d.statut === 'RETIREE' && c.statut === 'EN_ESSAYAGE' && c.statut_paiement !== 'SOLDE') {
-      throw conflict(`Solde non réglé : reste ${fcfa(c.total - c.montant_paye)} à encaisser avant le retrait.`);
-    }
     await changerStatut(db, c, d.statut, req.user.id);
     if (d.notes_retouches !== undefined) await db.query('UPDATE commande SET notes_retouches = $2 WHERE id = $1', [c.id, d.notes_retouches]);
-    if (d.statut === 'RETIREE') await creerDocument(db, c, 'FACTURE');
+    if (d.statut === 'PRETE') await creerMissionDomicile(db, c, 'LIVRAISON');
     return chargerCommande(c.id, db);
   });
   const client = await getUser(cmd.client_id);
@@ -279,10 +327,7 @@ router.patch('/:id/statut', requireRole('GERANT', 'TAILLEUR'), async (req, res) 
     await notifier('N08', [
       { user: client, canaux: ['EMAIL', 'SMS', 'INAPP'] },
       ...gerants.map((g) => ({ user: g, canaux: ['INAPP'] })),
-    ], { numero: cmd.numero, adresse: params.ADRESSE_ATELIER, horaires: params.HORAIRES_ATELIER, reste: fcfa(cmd.reste_a_payer) }, cmd.id);
-  }
-  if (d.statut === 'RETIREE') {
-    await notifier('N09', [{ user: client, canaux: ['EMAIL', 'INAPP'] }], { numero: cmd.numero, lien: `${require('../config').appUrl}/client/commandes/${cmd.id}` }, cmd.id);
+    ], { numero: cmd.numero, adresse: `${cmd.adresse_livraison || ''}, ${cmd.quartier_livraison || ''}`, reste: fcfa(cmd.reste_a_payer) }, cmd.id);
   }
   res.json(vuePourRole(cmd, req.user));
 });
@@ -367,4 +412,4 @@ async function envoyerPdf(req, res, type) {
 router.get('/:id/devis.pdf', requireRole('CLIENT', 'GERANT'), (req, res) => envoyerPdf(req, res, 'DEVIS'));
 router.get('/:id/facture.pdf', requireRole('CLIENT', 'GERANT'), (req, res) => envoyerPdf(req, res, 'FACTURE'));
 
-module.exports = { router, chargerCommande, changerStatut };
+module.exports = { router, chargerCommande, changerStatut, creerDocument };

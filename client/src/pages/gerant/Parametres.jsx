@@ -5,9 +5,9 @@ import { Champ, EnTete, Erreur, Spinner } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 
 const CHAMPS = [
-  ['NOM_MAISON', 'Nom de la maison'], ['ADRESSE_ATELIER', 'Adresse de l’atelier (essayage)'], ['HORAIRES_ATELIER', 'Horaires'],
+  ['NOM_MAISON', 'Nom de la maison'], ['ADRESSE_ATELIER', 'Adresse de l’atelier'], ['HORAIRES_ATELIER', 'Horaires'],
   ['TELEPHONE_MAISON', 'Téléphone'], ['EMAIL_MAISON', 'E-mail'], ['D_ALERTE_HEURES', 'Alerte avant deadline (heures)'],
-  ['FRAIS_COLLECTE', 'Frais de collecte (FCFA)'], ['ACOMPTE_POURCENT', 'Acompte minimum avant confection (%)'], ['CRENEAUX_COLLECTE', 'Créneaux de collecte'], ['MAX_TENTATIVES_NOTIF', 'Tentatives d’envoi max.'],
+  ['FRAIS_COLLECTE', 'Frais de collecte (FCFA)'], ['FRAIS_LIVRAISON', 'Frais de livraison à domicile (FCFA)'], ['DELAI_RETOUCHE_JOURS', 'Délai pour demander une retouche (jours)'], ['ACOMPTE_POURCENT', 'Acompte minimum avant confection (%)'], ['CRENEAUX_COLLECTE', 'Créneaux de collecte'], ['MAX_TENTATIVES_NOTIF', 'Tentatives d’envoi max.'],
 ];
 
 export default function Parametres() {

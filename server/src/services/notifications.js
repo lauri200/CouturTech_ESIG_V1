@@ -12,12 +12,15 @@ const MODELES = {
   N05: { sujet: 'CouturTech – Rappel de délai', texte: 'Rappel : la commande {numero} doit être prête le {deadline}.' },
   N06: { sujet: 'CouturTech – Retard sur la commande {numero}', texte: 'Retard : commande {numero} non prête à la deadline du {deadline}. Tailleur : {tailleur}.' },
   N07: { sujet: 'CouturTech – Nouvelle date pour la commande {numero}', texte: 'Votre commande {numero} sera prête le {date}. Motif : {motif}.' },
-  N08: { sujet: 'CouturTech – Votre commande {numero} est prête', texte: 'Bonne nouvelle {prenom} ! Votre commande {numero} est prête. Venez l’essayer à l’atelier : {adresse}, {horaires}. Reste à payer : {reste}.' },
-  N09: { sujet: 'CouturTech – Merci pour votre commande {numero}', texte: 'Merci {prenom} ! Commande {numero} retirée. Votre facture : {lien}.' },
-  N10: { sujet: 'CouturTech – Collecte {numero}', texte: 'Collecte {numero} : {adresse} ({repere}), le {date} {creneau}. Contact : {telephone}.' },
-  N11: { sujet: 'CouturTech – Collecte non effectuée', texte: 'Nous n’avons pas pu récupérer votre tissu ({motif}). Un nouveau passage vous sera proposé. Commande {numero}.' },
+  N08: { sujet: 'CouturTech – Votre commande {numero} est prête', texte: 'Bonne nouvelle {prenom} ! Votre commande {numero} est prête. Elle vous sera livrée à domicile ({adresse}). Reste à payer avant la livraison : {reste}.' },
+  N09: { sujet: 'CouturTech – Merci pour votre commande {numero}', texte: 'Merci {prenom} ! Commande {numero} livrée. Votre facture : {lien}. Une retouche est nécessaire ? Demandez-la depuis votre espace sous {delai} jours, un livreur viendra récupérer la tenue.' },
+  N10: { sujet: 'CouturTech – {mission} {numero}', texte: '{mission} {numero} : {adresse} ({repere}), le {date} {creneau}. Contact : {telephone}.' },
+  N11: { sujet: 'CouturTech – Collecte non effectuée', texte: 'Notre livreur n’a pas pu passer chez vous ({motif}). Un nouveau passage vous sera proposé. Commande {numero}.' },
   N12: { sujet: 'CouturTech – Stock bas', texte: 'Stock bas : {tissu} – {stock} m restants (seuil {seuil} m).' },
   N13: { sujet: 'CouturTech – Commande {numero} annulée', texte: 'La commande {numero} a été annulée. Motif : {motif}.' },
+  N14: { sujet: 'CouturTech – Livraison de votre commande {numero}', texte: 'CouturTech : votre commande {numero} vous sera livrée le {date} entre {creneau}.' },
+  N15: { sujet: 'CouturTech – Retouche demandée ({numero})', texte: 'Retouche demandée sur la commande {numero} : {motif}. Planifiez la récupération de la tenue.' },
+  N16: { sujet: 'CouturTech – Récupération pour retouche', texte: 'CouturTech : un livreur récupère votre tenue {numero} pour retouche le {date} entre {creneau}.' },
 };
 
 const remplir = (gabarit, vars) => gabarit.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));

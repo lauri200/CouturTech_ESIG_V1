@@ -27,6 +27,9 @@ export default function Commander() {
   const [photo, setPhoto] = useState(null);
   const [envoiPhoto, setEnvoiPhoto] = useState(false);
   const [collecte, setCollecte] = useState({ adresse: user.adresse || '', quartier: user.quartier || '', repere: '', telephone: user.telephone || '', date_souhaitee: aujourdhui(1), creneau_souhaite: '' });
+  const [livraison, setLivraison] = useState({ adresse: user.adresse || '', quartier: user.quartier || '', repere: '', telephone: user.telephone || '' });
+  const mensurations = useApi('/mensurations');
+  const [mensurationId, setMensurationId] = useState(null);
   const [err, setErr] = useState({});
   const [erreur, setErreur] = useState(null);
   const [envoi, setEnvoi] = useState(false);
@@ -35,9 +38,11 @@ export default function Commander() {
   const metrage = modele && taille ? modele.metrages[taille] : null;
   const creneaux = (params.data?.CRENEAUX_COLLECTE || '').split(',').filter(Boolean);
   const frais = Number(params.data?.FRAIS_COLLECTE) || 0;
+  const mensurationChoisie = mensurationId === 0 ? null : (mensurations.data || []).find((m) => m.id === mensurationId) || mensurations.data?.[0] || null;
+  const fraisLivraison = Number(params.data?.FRAIS_LIVRAISON) || 0;
   const pctAcompte = Number(params.data?.ACOMPTE_POURCENT) || 0;
   const prixTissu = source === 'MAISON' && tissu && metrage ? Math.round(tissu.prix_metre * metrage) : 0;
-  const total = (modele?.prix_confection || 0) + prixTissu + (source === 'CLIENT' ? frais : 0);
+  const total = (modele?.prix_confection || 0) + prixTissu + (source === 'CLIENT' ? frais : 0) + fraisLivraison;
   const remise = modele ? (() => { const d = new Date(); d.setDate(d.getDate() + modele.delai_jours); return d.toISOString().slice(0, 10); })() : null;
 
   useEffect(() => { window.scrollTo({ top: 0 }); }, [etape]);
@@ -79,10 +84,16 @@ export default function Commander() {
   };
 
   const valider = async () => {
+    const e = {};
+    if (!livraison.adresse.trim()) e.l_adresse = 'Adresse obligatoire';
+    if (!livraison.quartier.trim()) e.l_quartier = 'Quartier obligatoire';
+    if (!TEL.test(livraison.telephone.trim())) e.l_telephone = 'Format attendu : +228 XX XX XX XX';
+    setErr(e);
+    if (Object.keys(e).length) return;
     setEnvoi(true);
     setErreur(null);
     try {
-      const body = { modele_id: modele.id, taille, source_tissu: source };
+      const body = { modele_id: modele.id, taille, source_tissu: source, livraison: { ...livraison, telephone: livraison.telephone.trim() }, mensuration_id: mensurationChoisie?.id || null };
       if (source === 'MAISON') body.tissu_id = tissu.id;
       else Object.assign(body, { description_tissu_client: desc, photo_tissu_client_url: photo, collecte: { ...collecte, telephone: collecte.telephone.trim() } });
       const cmd = await api('/commandes', { method: 'POST', body, headers: { 'Idempotency-Key': cle.current }, retries: 2 });
@@ -129,7 +140,7 @@ export default function Commander() {
             <img src={modele.photos[0]} alt={modele.nom} className="aspect-[3/4] w-full max-w-[180px] rounded-xl object-cover" />
             <div>
               <h2 className="text-xl font-semibold">Votre taille pour « {modele.nom} »</h2>
-              <p className="mt-1 text-sm text-nuit/60">Les ajustements fins sont faits sur place lors de l’essayage.</p>
+              <p className="mt-1 text-sm text-nuit/60">Pas d’essayage à l’atelier : la tenue vous est livrée à domicile. Si une retouche est nécessaire, demandez-la en ligne et notre livreur vient la récupérer.</p>
               <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {TAILLES.filter((t) => modele.metrages[t]).map((t) => (
                   <button key={t} type="button" onClick={() => setTaille(t)} aria-pressed={taille === t}
@@ -139,6 +150,16 @@ export default function Commander() {
                 ))}
               </div>
               {err.taille && <p className="mt-2 text-sm text-red-700">{err.taille}</p>}
+            </div>
+            <div className="mt-6 rounded-lg border border-nuit/10 p-3 sm:col-span-2">
+              <p className="font-semibold">Mes mensurations (recommandé)</p>
+              <p className="text-sm text-nuit/60">La taille sert de repère ; le tailleur coupe d’après vos mesures en centimètres.</p>
+              {mensurations.data?.length ? (
+                <select aria-label="Mensurations" className="champ mt-2" value={mensurationChoisie?.id ?? 0} onChange={(e) => setMensurationId(Number(e.target.value))}>
+                  {mensurations.data.map((m) => <option key={m.id} value={m.id}>{m.source === 'SCAN' ? 'Scan' : 'Saisie'} du {date(m.created_at)}</option>)}
+                  <option value={0}>Ne pas joindre de mensurations</option>
+                </select>
+              ) : <Link to="/client/mensurations" className="btn-lien mt-2 inline-block">Ajouter mes mensurations →</Link>}
             </div>
           </section>
         )}
@@ -205,7 +226,7 @@ export default function Commander() {
                 <img src={modele.photos[0]} alt="" className="h-28 w-20 rounded-lg object-cover" />
                 <div>
                   <p className="font-semibold">{modele.nom}</p>
-                  <p className="text-sm text-nuit/60">Taille {taille} · {metrage} m</p>
+                  <p className="text-sm text-nuit/60">Taille {taille} · {metrage} m{mensurationChoisie ? ' · mensurations jointes' : ''}</p>
                   <p className="text-sm text-nuit/60">{source === 'MAISON' ? `Tissu : ${tissu.nom}` : 'Votre tissu (collecte à domicile)'}</p>
                 </div>
               </div>
@@ -216,14 +237,27 @@ export default function Commander() {
                   <p>{date(collecte.date_souhaitee)} · {collecte.creneau_souhaite} · {collecte.telephone}</p>
                 </div>
               )}
+              <div className="mt-4 rounded-lg border border-nuit/10 p-3">
+                <p className="font-semibold">Adresse de livraison de la tenue</p>
+                <div className="mt-2 grid gap-3">
+                  <Champ label="Adresse" id="ladr" erreur={err.l_adresse}><input id="ladr" className="champ" value={livraison.adresse} onChange={(e) => setLivraison({ ...livraison, adresse: e.target.value })} /></Champ>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Champ label="Quartier" id="lqr" erreur={err.l_quartier}><input id="lqr" className="champ" value={livraison.quartier} onChange={(e) => setLivraison({ ...livraison, quartier: e.target.value })} /></Champ>
+                    <Champ label="Téléphone" id="ltl" erreur={err.l_telephone}><input id="ltl" type="tel" className="champ" value={livraison.telephone} onChange={(e) => setLivraison({ ...livraison, telephone: e.target.value })} /></Champ>
+                  </div>
+                  <Champ label="Repère (facultatif)" id="lrp"><input id="lrp" className="champ" value={livraison.repere} placeholder="Ex. : portail bleu, face à la pharmacie" onChange={(e) => setLivraison({ ...livraison, repere: e.target.value })} /></Champ>
+                  {source === 'CLIENT' && <button type="button" className="w-fit text-sm text-nuit underline" onClick={() => setLivraison({ adresse: collecte.adresse, quartier: collecte.quartier, repere: collecte.repere, telephone: collecte.telephone })}>Même adresse que la collecte</button>}
+                </div>
+              </div>
               <p className="mt-4 text-sm text-nuit/70">Date de remise prévue : <strong>{date(remise)}</strong>{source === 'CLIENT' ? ' (sous réserve de la collecte de votre tissu)' : ''}.</p>
-              <p className="mt-1 text-sm text-nuit/70">Vous recevrez un e-mail de confirmation. Paiement à l’atelier (espèces ou Mobile Money).</p>
+              <p className="mt-1 text-sm text-nuit/70">Vous recevrez un e-mail de confirmation. Paiement en espèces ou par Mobile Money ; le solde est réglé avant la livraison.</p>
             </div>
             <aside className="carte h-fit p-5">
               <dl>
                 <Ligne label="Confection">{fcfa(modele.prix_confection)}</Ligne>
                 <Ligne label="Tissu">{source === 'MAISON' ? fcfa(prixTissu) : 'Fourni'}</Ligne>
                 {source === 'CLIENT' && frais > 0 && <Ligne label="Collecte">{fcfa(frais)}</Ligne>}
+                {fraisLivraison > 0 && <Ligne label="Livraison à domicile">{fcfa(fraisLivraison)}</Ligne>}
                 <div className="mt-2 flex justify-between border-t border-nuit/10 pt-3 text-lg font-bold"><span>Total</span><span>{fcfa(total)}</span></div>
                 {pctAcompte > 0 && <p className="mt-2 text-xs text-nuit/70">Acompte de {pctAcompte} % ({fcfa(Math.ceil((total * pctAcompte) / 100))}) à régler avant le début de la confection.</p>}
               </dl>

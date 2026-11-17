@@ -36,7 +36,7 @@ export default function Accueil() {
         <div className="conteneur relative py-20 sm:py-28 lg:py-36">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-or-400">Haute couture · Lomé</p>
           <h1 className="mt-4 max-w-2xl text-4xl font-bold leading-tight sm:text-5xl lg:text-6xl">Votre tenue sur mesure, sans allers-retours.</h1>
-          <p className="mt-5 max-w-xl text-base text-white/85 sm:text-lg">Choisissez un modèle, votre taille et votre tissu. Nous récupérons votre tissu, l’atelier respecte une date fixée, et vous ne vous déplacez qu’une fois : pour l’essayage.</p>
+          <p className="mt-5 max-w-xl text-base text-white/85 sm:text-lg">Choisissez un modèle, votre taille et votre tissu. Nous récupérons votre tissu, l’atelier respecte une date fixée, et votre tenue vous est livrée à domicile, sans aucun déplacement.</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/modeles" className="btn-or px-6 text-base">Voir les modèles</Link>
             <Link to="/inscription" className="btn border border-white/40 px-6 text-base text-white hover:bg-white/10">Créer mon compte</Link>
@@ -85,12 +85,12 @@ export default function Accueil() {
 
       <section className="conteneur grid items-center gap-10 pb-4 md:grid-cols-2">
         <div className="md:order-2">
-          <img src="/images/essayage.webp" alt="Essayage et retouches à l’atelier" loading="lazy" className="aspect-[4/3] w-full rounded-2xl object-cover shadow-lg" />
+          <img src="/images/essayage.webp" alt="Tenue livrée et retouches à distance" loading="lazy" className="aspect-[4/3] w-full rounded-2xl object-cover shadow-lg" />
         </div>
         <div>
           <p className="text-sm font-semibold uppercase tracking-widest text-or-600">Une date tenue</p>
           <h2 className="titre-section mt-2">Prévenu(e) dès que c’est prêt.</h2>
-          <p className="mt-4 text-nuit/70">Chaque commande a une deadline fixée au tailleur. Le jour où votre tenue est prête, vous recevez un e-mail et un SMS. Vous venez l’essayer, les retouches sont faites immédiatement, et vous repartez avec.</p>
+          <p className="mt-4 text-nuit/70">Chaque commande a une deadline fixée au tailleur. Le jour où votre tenue est prête, vous recevez un e-mail et un SMS. Elle vous est ensuite livrée chez vous. Une retouche ? Demandez-la en ligne : notre livreur vient récupérer la tenue.</p>
           <Link to="/inscription" className="btn-or mt-6">Créer mon compte</Link>
         </div>
       </section>

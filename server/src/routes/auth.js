@@ -112,7 +112,7 @@ router.patch('/me', authenticate, async (req, res) => {
 
 router.delete('/me', authenticate, async (req, res) => {
   if (req.user.role !== 'CLIENT') throw badRequest('Seul un compte client peut être supprimé ici.');
-  const enCours = await query("SELECT 1 FROM commande WHERE client_id = $1 AND statut NOT IN ('RETIREE','ANNULEE') LIMIT 1", [req.user.id]);
+  const enCours = await query("SELECT 1 FROM commande WHERE client_id = $1 AND statut NOT IN ('LIVREE','ANNULEE') LIMIT 1", [req.user.id]);
   if (enCours.rowCount) throw conflict('Vous avez une commande en cours : suppression impossible pour le moment.');
   const total = await query('SELECT 1 FROM commande WHERE client_id = $1 LIMIT 1', [req.user.id]);
   if (total.rowCount) {

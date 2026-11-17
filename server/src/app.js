@@ -16,6 +16,7 @@ api.use('/auth', require('./routes/auth'));
 api.use('/', require('./routes/catalogue').router);
 api.use('/commandes', require('./routes/commandes').router);
 api.use('/collectes', require('./routes/collectes'));
+api.use('/mensurations', require('./routes/mensurations'));
 api.use('/', require('./routes/divers'));
 api.use((_req, _res, next) => next(new HttpError(404, 'Ressource introuvable.')));
 

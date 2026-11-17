@@ -10,7 +10,7 @@ export default function Taches() {
   return (
     <>
       <EnTete titre="Mes tâches" sousTitre="Triées par deadline" />
-      <div className="mb-4 flex gap-2">{[['ATTRIBUEE,EN_CONFECTION', 'À faire'], ['PRETE,EN_ESSAYAGE,RETIREE', 'Terminées']].map(([v, l]) => <button key={v} type="button" onClick={() => setOnglet(v)} className={`rounded-full px-4 py-2 text-sm font-medium ${onglet === v ? 'bg-nuit text-white' : 'border border-nuit/15 bg-white'}`}>{l}</button>)}</div>
+      <div className="mb-4 flex gap-2">{[['ATTRIBUEE,EN_CONFECTION', 'À faire'], ['PRETE,EN_LIVRAISON,LIVREE,RETOUCHE_DEMANDEE', 'Terminées']].map(([v, l]) => <button key={v} type="button" onClick={() => setOnglet(v)} className={`rounded-full px-4 py-2 text-sm font-medium ${onglet === v ? 'bg-nuit text-white' : 'border border-nuit/15 bg-white'}`}>{l}</button>)}</div>
       <Erreur erreur={erreur} onRetry={recharger} />
       {!data ? <Spinner /> : data.length === 0 ? <Vide titre="Aucune tâche" texte="Les nouvelles tâches apparaissent ici dès que le gérant vous les attribue." /> : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

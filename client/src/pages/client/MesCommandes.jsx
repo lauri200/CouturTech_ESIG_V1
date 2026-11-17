@@ -25,7 +25,7 @@ export default function MesCommandes() {
                     <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-nuit/50">{c.numero}</span><Badge statut={c.statut} /></div>
                     <p className="mt-1 truncate font-semibold">{c.modele_nom} · {c.taille}</p>
                     <p className="text-sm text-nuit/60">{c.source_tissu === 'MAISON' ? c.tissu_nom : 'Votre tissu'}</p>
-                    <p className="mt-1 text-sm">{c.statut === 'RETIREE' || c.statut === 'ANNULEE' ? `Commandée le ${date(c.created_at)}` : `Remise prévue : ${date(c.date_remise_prevue)}`}</p>
+                    <p className="mt-1 text-sm">{c.statut === 'LIVREE' || c.statut === 'ANNULEE' ? `Commandée le ${date(c.created_at)}` : `Remise prévue : ${date(c.date_remise_prevue)}`}</p>
                   </div>
                   <div className="hidden text-right sm:block">
                     <p className="font-bold">{fcfa(c.total)}</p>

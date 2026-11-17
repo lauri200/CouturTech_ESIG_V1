@@ -6,6 +6,7 @@ import { aujourdhui, date, fcfa, MODES_PAIEMENT } from '../../lib/format';
 import { Badge, Champ, Erreur, Ligne, Modal, Retard, Spinner } from '../../components/ui';
 import Historique from '../../components/Historique';
 import { useToast } from '../../components/Toast';
+import { SectionMensurations } from '../../components/Mensurations';
 
 export default function CommandeDetail() {
   const { id } = useParams();
@@ -43,10 +44,10 @@ export default function CommandeDetail() {
         {c.statut === 'EN_ATTENTE_COLLECTE' && <Link to="/gerant/collectes" className="btn-contour">Gérer la collecte</Link>}
         {c.statut === 'ATTRIBUEE' && <button type="button" className="btn-contour" onClick={() => statut('EN_CONFECTION', 'Confection démarrée.')}>DÉMARRER LA CONFECTION</button>}
         {c.statut === 'EN_CONFECTION' && <button type="button" className="btn-primaire" onClick={() => statut('PRETE', 'Commande prête : client prévenu.')}>MARQUER PRÊTE</button>}
-        {c.statut === 'PRETE' && <button type="button" className="btn-primaire" onClick={() => statut('EN_ESSAYAGE', 'Essayage en cours.')}>CLIENT EN ESSAYAGE</button>}
-        {c.statut === 'EN_ESSAYAGE' && <button type="button" className="btn-or" onClick={() => ouvrir('retrait', { notes_retouches: c.notes_retouches || '' })}>MARQUER RETIRÉE</button>}
-        {!['RETIREE', 'ANNULEE'].includes(c.statut) && c.reste_a_payer > 0 && <button type="button" className="btn-contour" onClick={() => ouvrir('paiement', { montant: c.reste_a_payer, mode: 'ESPECES', reference: '', date_paiement: aujourdhui() })}>ENREGISTRER UN PAIEMENT</button>}
-        {!['RETIREE', 'ANNULEE'].includes(c.statut) && <button type="button" className="btn-contour" onClick={() => ouvrir('date', { deadline: c.deadline || '', date_remise_prevue: c.date_remise_prevue, motif: '' })}>MODIFIER LES DATES</button>}
+        {['PRETE', 'EN_LIVRAISON'].includes(c.statut) && <Link to="/gerant/collectes" className="btn-primaire">GÉRER LA LIVRAISON</Link>}
+        {c.statut === 'RETOUCHE_DEMANDEE' && <Link to="/gerant/collectes" className="btn-or">PLANIFIER LA RÉCUPÉRATION</Link>}
+        {!['LIVREE', 'ANNULEE'].includes(c.statut) && c.reste_a_payer > 0 && <button type="button" className="btn-contour" onClick={() => ouvrir('paiement', { montant: c.reste_a_payer, mode: 'ESPECES', reference: '', date_paiement: aujourdhui() })}>ENREGISTRER UN PAIEMENT</button>}
+        {!['LIVREE', 'ANNULEE'].includes(c.statut) && <button type="button" className="btn-contour" onClick={() => ouvrir('date', { deadline: c.deadline || '', date_remise_prevue: c.date_remise_prevue, motif: '' })}>MODIFIER LES DATES</button>}
         <button type="button" className="btn-contour" onClick={() => ouvrirPdf(`/commandes/${c.id}/devis.pdf`).catch((e) => toast(e.message, 'erreur'))}>Devis PDF</button>
         {c.documents.some((d) => d.type === 'FACTURE') && <button type="button" className="btn-contour" onClick={() => ouvrirPdf(`/commandes/${c.id}/facture.pdf`)}>Facture PDF</button>}
         {annulable && <button type="button" className="btn-danger" onClick={() => ouvrir('annuler', { motif: '' })}>ANNULER</button>}
@@ -58,6 +59,8 @@ export default function CommandeDetail() {
             <img src={c.modele_photo} alt="" className="h-36 w-[110px] rounded-lg object-cover" />
             <dl className="text-sm">
               <Ligne label="Modèle">{c.modele_nom} ({c.modele_reference})</Ligne>
+              <Ligne label="Livraison">{c.adresse_livraison ? `${c.adresse_livraison}, ${c.quartier_livraison}${c.repere_livraison ? ` (${c.repere_livraison})` : ''} · ${c.telephone_livraison}` : 'À préciser avec le client'}</Ligne>
+              {c.motif_retouche && <Ligne label="Retouche demandée">{c.motif_retouche}{c.photo_retouche_url && <> · <a href={c.photo_retouche_url} target="_blank" rel="noreferrer" className="underline">photo</a></>}</Ligne>}
               <Ligne label="Taille / métrage">{c.taille} · {c.metrage} m</Ligne>
               <Ligne label="Tissu">{c.source_tissu === 'MAISON' ? c.tissu_nom : `Client : ${c.description_tissu_client}`}</Ligne>
               <Ligne label="Tailleur">{c.tailleur_nom || '—'}</Ligne>
@@ -98,6 +101,7 @@ export default function CommandeDetail() {
               <Ligne label="Confection">{fcfa(c.prix_confection)}</Ligne>
               <Ligne label="Tissu">{fcfa(c.prix_tissu)}</Ligne>
               {c.frais_collecte > 0 && <Ligne label="Collecte">{fcfa(c.frais_collecte)}</Ligne>}
+              {c.frais_livraison > 0 && <Ligne label="Livraison">{fcfa(c.frais_livraison)}</Ligne>}
               <Ligne label="Total"><strong>{fcfa(c.total)}</strong></Ligne>
               <Ligne label="Payé">{fcfa(c.montant_paye)}</Ligne>
               <Ligne label="Reste"><strong>{fcfa(c.reste_a_payer)}</strong></Ligne>
@@ -105,6 +109,7 @@ export default function CommandeDetail() {
             <Badge statut={c.statut_paiement} type="paiement" />
             {c.paiements.length > 0 && <ul className="mt-3 space-y-1 border-t border-nuit/10 pt-2 text-xs">{c.paiements.map((p) => <li key={p.id}>{date(p.date_paiement)} · {MODES_PAIEMENT[p.mode]} · {fcfa(p.montant)}{p.reference ? ` · ${p.reference}` : ''}</li>)}</ul>}
           </section>
+          <SectionMensurations mensuration={c.mensuration} />
           <section className="carte p-4"><h2 className="mb-3 font-semibold">Historique</h2><Historique items={c.historique} /></section>
         </div>
       </div>
@@ -136,14 +141,6 @@ export default function CommandeDetail() {
           <Champ label="Date" id="dp"><input id="dp" type="date" className="champ" value={f.date_paiement} onChange={(e) => setF({ ...f, date_paiement: e.target.value })} /></Champ>
           <Erreur erreur={err} />
           <button type="button" className="btn-or w-full" onClick={() => action('/paiements', 'POST', { ...f, montant: Number(f.montant) }, 'Paiement enregistré.')}>ENREGISTRER</button>
-        </div>
-      </Modal>
-      <Modal ouvert={modal === 'retrait'} titre="Retrait de la tenue" onFermer={() => setModal(null)}>
-        <div className="space-y-4">
-          {c.statut_paiement !== 'SOLDE' && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Solde non réglé : reste {fcfa(c.reste_a_payer)}. Enregistrez le paiement avant le retrait.</p>}
-          <Champ label="Retouches effectuées (facultatif)" id="rt"><textarea id="rt" rows={3} className="champ" value={f.notes_retouches} onChange={(e) => setF({ ...f, notes_retouches: e.target.value })} /></Champ>
-          <Erreur erreur={err} />
-          <button type="button" className="btn-or w-full" onClick={() => statut('RETIREE', 'Commande retirée : facture générée.', { notes_retouches: f.notes_retouches })}>CONFIRMER LE RETRAIT</button>
         </div>
       </Modal>
       <Modal ouvert={modal === 'annuler'} titre="Annuler la commande" onFermer={() => setModal(null)}>

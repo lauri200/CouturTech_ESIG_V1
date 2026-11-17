@@ -36,6 +36,7 @@ function genererPdf({ type, numero, date, commande, params, paiements }) {
       [tissu, commande.prix_tissu],
     ];
     if (commande.frais_collecte > 0) lignes.push(['Collecte du tissu à domicile', commande.frais_collecte]);
+    if (commande.frais_livraison > 0) lignes.push(['Livraison de la tenue à domicile', commande.frais_livraison]);
 
     let y = 225;
     doc.rect(50, y, 495, 20).fill(NAVY);

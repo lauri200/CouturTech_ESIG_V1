@@ -18,7 +18,8 @@ export default function TableauDeBord() {
         <Stat label="En retard" valeur={k.en_retard} accent={k.en_retard > 0} />
         <Stat label="À attribuer" valeur={k.a_attribuer} />
         <Stat label="Collectes en attente" valeur={k.collectes_attente} />
-        <Stat label="Prêtes / en essayage" valeur={k.pretes} />
+        <Stat label="Prêtes / en livraison" valeur={k.pretes} />
+        <Stat label="Retouches demandées" valeur={k.retouches} />
         <Stat label="Encaissé ce mois" valeur={fcfa(k.encaisse_mois)} />
         <Stat label="Reste à encaisser" valeur={fcfa(k.reste_a_encaisser)} />
         <Stat label="Ponctualité" valeur={ponct === null ? '—' : `${ponct} %`} aide="Commandes prêtes à la deadline" />

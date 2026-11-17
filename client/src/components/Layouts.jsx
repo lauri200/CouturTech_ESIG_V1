@@ -34,6 +34,7 @@ function Header() {
         <nav className="hidden items-center gap-1 md:flex" aria-label="Navigation principale">
           {LIENS_PUBLICS.map(([to, l]) => <NavLink key={to} to={to} end={to === '/'} className={lien}>{l}</NavLink>)}
           {user?.role === 'CLIENT' && <NavLink to="/client/commandes" className={lien}>Mes commandes</NavLink>}
+          {user?.role === 'CLIENT' && <NavLink to="/client/mensurations" className={lien}>Mes mensurations</NavLink>}
         </nav>
         <div className="flex items-center gap-2">
           {user?.role === 'CLIENT' && <Cloche lienCommande={(id) => `/client/commandes/${id}`} />}
@@ -56,6 +57,7 @@ function Header() {
           <div className="conteneur flex flex-col py-2" onClick={() => setMenu(false)}>
             {LIENS_PUBLICS.map(([to, l]) => <NavLink key={to} to={to} end={to === '/'} className={lien}>{l}</NavLink>)}
             {user?.role === 'CLIENT' && <NavLink to="/client/commandes" className={lien}>Mes commandes</NavLink>}
+            {user?.role === 'CLIENT' && <NavLink to="/client/mensurations" className={lien}>Mes mensurations</NavLink>}
             {user?.role === 'CLIENT' && <NavLink to="/client/profil" className={lien}>Mon profil</NavLink>}
             {user && user.role !== 'CLIENT' && <NavLink to={ESPACES[user.role]} className={lien}>Mon espace</NavLink>}
             {!user && <NavLink to="/connexion" className={lien}>Se connecter</NavLink>}
@@ -135,7 +137,7 @@ const MENUS = {
     ['/tailleur/profil', 'Mon profil', 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0M4 21a8 8 0 0 1 16 0'],
   ],
   LIVREUR: [
-    ['/livreur', 'Mes collectes', 'M3 7h11v10H3zM14 10h4l3 3v4h-7'],
+    ['/livreur', 'Mes missions', 'M3 7h11v10H3zM14 10h4l3 3v4h-7'],
     ['/livreur/profil', 'Mon profil', 'M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0M4 21a8 8 0 0 1 16 0'],
   ],
 };

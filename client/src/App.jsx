@@ -15,6 +15,7 @@ import Profil from './pages/Profil';
 const Commander = lazy(() => import('./pages/client/Commander'));
 const MesCommandes = lazy(() => import('./pages/client/MesCommandes'));
 const SuiviCommande = lazy(() => import('./pages/client/SuiviCommande'));
+const MesMensurations = lazy(() => import('./pages/client/MesMensurations'));
 const TableauDeBord = lazy(() => import('./pages/gerant/TableauDeBord'));
 const GCommandes = lazy(() => import('./pages/gerant/Commandes'));
 const GCommande = lazy(() => import('./pages/gerant/CommandeDetail'));
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="client/commander" element={<Protege roles={['CLIENT']}><Commander /></Protege>} />
           <Route path="client/commandes" element={<Protege roles={['CLIENT']}><MesCommandes /></Protege>} />
           <Route path="client/commandes/:id" element={<Protege roles={['CLIENT']}><SuiviCommande /></Protege>} />
+          <Route path="client/mensurations" element={<Protege roles={['CLIENT']}><MesMensurations /></Protege>} />
           <Route path="client/profil" element={<Protege roles={['CLIENT']}><div className="conteneur py-8"><Profil /></div></Protege>} />
           <Route path="*" element={<Introuvable />} />
         </Route>

@@ -67,7 +67,7 @@ export default function FicheModele() {
                     {['Tour de poitrine', 'Tour de taille', 'Tour de hanches'].map((l, i) => <tr key={l}><td>{l} (cm)</td>{tailles.map((t) => <td key={t} className="whitespace-nowrap">{MENSURATIONS[t]?.[i]}</td>)}</tr>)}
                   </tbody>
                 </table>
-                <p className="px-3 py-2 text-xs text-nuit/60">Mensurations indicatives. Les ajustements fins sont faits lors de l’essayage, sur place.</p>
+                <p className="px-3 py-2 text-xs text-nuit/60">Mensurations indicatives. La tenue est livrée à domicile ; une retouche peut être demandée en ligne après la livraison.</p>
               </div>
             )}
           </div>
